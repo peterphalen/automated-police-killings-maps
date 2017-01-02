@@ -7,21 +7,20 @@ import webapp2
 import folium
 import json
 import urllib2
-
 from google.appengine.api import app_identity
 #[END imports]
 
 killings = urllib2.urlopen("https://raw.githubusercontent.com/joshbegley/the-counted/master/skeleton.json")
 data = json.load(killings)  
-ages = "" 
-for i in range(0, len(data)):
-    ages = ages + str(data[i]['age']) + "\n"
 
 
-webpage_header = r""" <html><head> 
+
+webpage_header = r"""<!DOCTYPE html>
+                <html>          
+                <head> 
                 <title>Mapping police killings - armed versus unarmed</title> 
                 <meta name="description" content="Coordinates of police killings across the United States of America, colored according to whether the victim was armed or unarmed. Mouse-over to discover facts about the killing, such as the age, name, and race of the victim, and the cause of death."> 
-                <meta http-equiv="content-type" content="text/html; charset=UTF-8" />                  
+                <meta charset="utf-8"/>
                 <meta name="author" content="Peter Phalen"/> 
                 <link rel="icon" type="image/png" href="../images/icon-code-fork-16x16.png" sizes="16x16"> 
                 <link rel="icon" type="image/png" href="../images/icon-code-fork-32x32.png" sizes="32x32"> 
@@ -41,17 +40,20 @@ webpage_header = r""" <html><head>
 
 
 #[START retries]
-my_default_retry_params = gcs.RetryParams(initial_delay=0.2,
-                                          max_delay=5.0,
+my_default_retry_params = gcs.RetryParams(initial_delay=5,
+                                          max_delay=30,
                                           backoff_factor=2,
-                                          max_retry_period=15)
+                                          max_retry_period=200)
 gcs.set_default_retry_params(my_default_retry_params)
 #[END retries]
 
 
 #[MAP definition]
-map_killings = folium.Map(location=[45.5236, -122.6750])
+map_killings = folium.Map(location=[39.8282, -98.5795], zoom_start=5)
 
+#iterate markers
+for i in range(0, len(data)):
+    map_killings.simple_marker([data[i]['lat'], data[i]['long']], popup=data[i]['name'])
 
 
 class MainPage(webapp2.RequestHandler):
@@ -77,7 +79,7 @@ class MainPage(webapp2.RequestHandler):
             gcs_file = gcs.open(filename)
             map_html = gcs_file.read()
             map_html = map_html[150:len(map_html)] #drop opening headers
-            full_webpage_html = webpage_header + map_html
+            full_webpage_html = webpage_header + map_html + "\n\n</html>"
 
             self.response.write(full_webpage_html)
             gcs_file.close()
@@ -103,7 +105,7 @@ class MainPage(webapp2.RequestHandler):
                         options={'x-goog-meta-foo': 'foo',
                                  'x-goog-meta-bar': 'bar'},
                         retry_params=write_retry_params)
-        map_killings.save(gcs_file)
+        map_killings.create_map(gcs_file)
         gcs_file.close()
         self.tmp_filenames_to_clean_up.append(filename)
     #[END write]
