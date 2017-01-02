@@ -18,6 +18,26 @@ for i in range(0, len(data)):
     ages = ages + str(data[i]['age']) + "\n"
 
 
+webpage_header = r""" <html><head> 
+                <title>Mapping police killings - armed versus unarmed</title> 
+                <meta name="description" content="Coordinates of police killings across the United States of America, colored according to whether the victim was armed or unarmed. Mouse-over to discover facts about the killing, such as the age, name, and race of the victim, and the cause of death."> 
+                <meta http-equiv="content-type" content="text/html; charset=UTF-8" />                  
+                <meta name="author" content="Peter Phalen"/> 
+                <link rel="icon" type="image/png" href="../images/icon-code-fork-16x16.png" sizes="16x16"> 
+                <link rel="icon" type="image/png" href="../images/icon-code-fork-32x32.png" sizes="32x32"> 
+                <link rel="icon" type="image/x-icon" href="../images/favicon.ico"> 
+                <link rel="shortcut icon" type="image/x-icon" href="../images/favicon.ico"/> 
+                <meta property="og:url" content="https://www.peterphalen.com/datavisualization/map-police-killings.html"/> 
+                <meta property="og:title" content="Mapping police killings"/> 
+                <meta property="og:description" content="Interactive map of police killings in the United States. Generated using data from The Guardian's The Counted project."/> 
+                <meta property="og:image" content="https://www.peterphalen.com/images/police-killings-map-img.png"/> 
+                <meta property="twitter:card" content="summary_large_image"/> 
+                <meta property="twitter:creator" content="@peterphalen"/> 
+                <meta property="twitter:description" content="Interactive map of police killings in the United States. Generated using data from The Guardian'\s The Counted project."/> 
+                <meta name="twitter:image" content="https://www.peterphalen.com/images/police-killings-map-img.png"/> type" content="text/html; charset=UTF-8" />
+                 """
+        
+            
 
 
 #[START retries]
@@ -29,6 +49,10 @@ gcs.set_default_retry_params(my_default_retry_params)
 #[END retries]
 
 
+#[MAP definition]
+map_killings = folium.Map(location=[45.5236, -122.6750])
+
+
 
 class MainPage(webapp2.RequestHandler):
     """Main page for GCS demo application."""
@@ -36,28 +60,28 @@ class MainPage(webapp2.RequestHandler):
     #[START get_default_bucket]
     def get(self):
 
-        self.response.write(ages)
-
 
         bucket_name = os.environ.get('BUCKET_NAME',
                                      app_identity.get_default_gcs_bucket_name())
 
         self.response.headers['Content-Type'] = 'text/plain'
-        self.response.write('Demo GCS Application running from Version: '
-                            + os.environ['CURRENT_VERSION_ID'] + '\n')
-        self.response.write('Using bucket name: ' + bucket_name + '\n\n')
-        #[END get_default_bucket]
 
         bucket = '/' + bucket_name
         filename = bucket + '/demo-testfile'
         self.tmp_filenames_to_clean_up = []
 
         try:
-          self.create_file(filename)
-          self.response.write('\n\n')
+            self.create_file(filename)
+            self.response.write('\n\n')
 
-          self.read_file(filename)
-          self.response.write('\n\n')
+            gcs_file = gcs.open(filename)
+            map_html = gcs_file.read()
+            map_html = map_html[150:len(map_html)] #drop opening headers
+            full_webpage_html = webpage_header + map_html
+
+            self.response.write(full_webpage_html)
+            gcs_file.close()
+            self.response.write('\n\n')
 
 
         except Exception, e:
@@ -66,12 +90,11 @@ class MainPage(webapp2.RequestHandler):
                               'Please check the logs for more details.\n')
 
         else:
-          self.response.write('\n\nThe demo ran successfully!\n')
+          pass
 
     #[START write]
     def create_file(self, filename):
 
-        self.response.write('Creating file %s\n' % filename)
 
         write_retry_params = gcs.RetryParams(backoff_factor=1.1)
         gcs_file = gcs.open(filename,
@@ -80,22 +103,11 @@ class MainPage(webapp2.RequestHandler):
                         options={'x-goog-meta-foo': 'foo',
                                  'x-goog-meta-bar': 'bar'},
                         retry_params=write_retry_params)
-        gcs_file.write('abcde\n')
-        gcs_file.write('f'*1024*4 + '\n')
+        map_killings.save(gcs_file)
         gcs_file.close()
         self.tmp_filenames_to_clean_up.append(filename)
     #[END write]
 
-    #[START read]
-    def read_file(self, filename):
-        self.response.write('Abbreviated file content (first line and last 1K):\n')
-
-        gcs_file = gcs.open(filename)
-        self.response.write(gcs_file.readline())
-        gcs_file.seek(-1024, os.SEEK_END)
-        self.response.write(gcs_file.read())
-        gcs_file.close()
-    #[END read]
 
 
 
