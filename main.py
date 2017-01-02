@@ -5,9 +5,18 @@ import os
 import cloudstorage as gcs
 import webapp2
 import folium
+import json
+import urllib2
 
 from google.appengine.api import app_identity
 #[END imports]
+
+killings = urllib2.urlopen("https://raw.githubusercontent.com/joshbegley/the-counted/master/skeleton.json")
+data = json.load(killings)  
+ages = "" 
+for i in range(0, len(data)):
+    ages = ages + str(data[i]['age']) + "\n"
+
 
 
 
@@ -26,6 +35,10 @@ class MainPage(webapp2.RequestHandler):
 
     #[START get_default_bucket]
     def get(self):
+
+        self.response.write(ages)
+
+
         bucket_name = os.environ.get('BUCKET_NAME',
                                      app_identity.get_default_gcs_bucket_name())
 
